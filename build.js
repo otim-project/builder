@@ -4,15 +4,56 @@ let latexOnline;
 LatexOnline.create('/tmp/downloads/', '/tmp/storage/').then(
     function (initializedLatexOnline) {
         latexOnline = initializedLatexOnline;
-        compileGit(
-            'https://github.com/jakebian/OTIM-toen-mastercourse',
-            'chapters/lecture1.tex',
-            'pdflatex'
+        console.log(
+
+            compileFromConfig({
+                nodes: [{
+                    key: 'toen-mastercourse',
+                    repo: 'jakebian/OTIM-toen-mastercourse'
+                }],
+                pathsMap: {
+                    'toen-mastercourse': [
+                        "/chapters/lecture1.tex",
+                        "/chapters/lecture2-3.tex"
+                    ]
+                }
+            })
+
         )
     }
 )
 
-async function compileGit(gitRepo, targetFile, latexCommand, branch='master', workdir='') {
+function compileFromConfig({nodes, pathsMap}) {
+    const outputPathMaps = {};
+    nodes.forEach(
+        ({key, repo}) => {
+            const paths = pathsMap[key];
+            if (!outputPathMaps[key]) {
+                outputPathMaps[key] = {};
+            }
+            if (!paths) {
+                console.error(`Bad or missing metadata for node ${key} : ${repo}`)
+                return;
+            }
+            paths.forEach(
+                path => {
+                    const outputPath = compileGit(
+                        `https://github.com/${trimLeadingSlash(repo)}`,
+                        trimLeadingSlash(path),
+                    );
+                    outputPathMaps[key][path] = outputPath;
+                }
+            )
+        }
+    )
+    return outputPathMaps;
+}
+
+function trimLeadingSlash(s) {
+    return s.replace(/^\/|\/$/g, '');
+}
+
+async function compileGit(gitRepo, targetFile, latexCommand='pdflatex', branch='master', workdir='') {
     const preparation = await latexOnline.prepareGitCompilation(
         gitRepo,
         targetFile,
@@ -35,11 +76,11 @@ async function compilePreparation(preparation) {
     downloader.dispose();
 
     if (compilation.userError) {
-        console.log(compilation.userError);
+        console.error(compilation.userError);
     }
 
     if (compilation.success) {
-        console.log(compilation.outputPath())
+        return compilation.outputPath();
     }
 }
 
