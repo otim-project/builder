@@ -21,10 +21,8 @@ LatexOnline.create('/tmp/downloads/', '/tmp/storage/').then(
 
         const config = await getConfig();
         const outputs = await compileFromConfig(config)
-
-        console.log(outputs)
-
-        upload(outputs)
+        uploadResult(outputs)
+        console.log('completed');
     }
 )
 
@@ -86,7 +84,7 @@ function parseYamlConfig(rawFile) {
     return yaml.load(Buffer.from(rawFile, 'base64').toString());
 }
 
-function upload(keyToOutputPathsMap) {
+function uploadResult(keyToOutputPathsMap) {
     Object.keys(keyToOutputPathsMap).forEach(
         nodeKey => {
             const pathsMap = keyToOutputPathsMap[nodeKey];
