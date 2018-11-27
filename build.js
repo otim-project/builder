@@ -1,6 +1,8 @@
 const LatexOnline = require('./lib/LatexOnline');
 const s3 = require('s3');
 const { accessKeyId, secretAccessKey, region, Bucket } = require('./s3creds');
+const octokit = require('@octokit/rest')()
+const yaml = require('js-yaml');
 
 const s3Client = s3.createClient({
   s3Options: {
@@ -12,27 +14,13 @@ const s3Client = s3.createClient({
 
 let latexOnline;
 
+
 LatexOnline.create('/tmp/downloads/', '/tmp/storage/').then(
     async function (initializedLatexOnline) {
         latexOnline = initializedLatexOnline;
-        const outputs = await compileFromConfig({
-            nodes: [
-                {
-                    key: 'toen-mastercourse',
-                    repo: 'jakebian/OTIM-toen-mastercourse'
-                },
-                {
-                    key: 'non-existence',
-                    repo: 'jakebian/non-existence'
-                }
-            ],
-            pathsMap: {
-                'toen-mastercourse': [
-                    '/chapters/lecture1.tex',
-                    '/chapters/lecture2-3.tex'
-                ]
-            }
-        })
+
+        const config = await getConfig();
+        const outputs = await compileFromConfig(config)
 
         console.log(outputs)
 
@@ -40,6 +28,63 @@ LatexOnline.create('/tmp/downloads/', '/tmp/storage/').then(
     }
 )
 
+async function getConfig() {
+    const nodes = await getNodesConfig();
+    const pathsMap = await getPathsMap(nodes);
+    return {
+        nodes,
+        pathsMap
+    }
+}
+
+async function getPathsMap(nodesConfig) {
+    return nodesConfig.reduce(async (result, {key, repo: nodeRepo }) => {
+        const [ owner, repo ] = trimSlashes(nodeRepo).split('/');
+        const nodeContent = await getNodeContent(owner, repo);
+        return {
+            ...result,
+            [key]: getAllPaths(nodeContent)
+        };
+    }, {});
+}
+
+function getAllPaths(nodes) {
+    return nodes.reduce((result, {path, sub}) => {
+        if (sub) {
+            return [...result, ...getAllPaths(sub)]
+        }
+
+        if (path) {
+            return [...result, path];
+        }
+
+        return result
+    }, []);
+}
+
+async function getNodesConfig() {
+    const result = await octokit.repos.getContents({
+        owner: 'otim-project',
+        repo: 'root',
+        path: 'nodes.yaml',
+        ref: 'master'
+    });
+    return parseYamlConfig(result.data.content);
+}
+
+async function getNodeContent(owner, repo) {
+    const result = await octokit.repos.getContents({
+        owner,
+        repo,
+        path: '.otim/content.yaml',
+        ref: 'master'
+    })
+    return parseYamlConfig(result.data.content);
+}
+
+function parseYamlConfig(rawFile) {
+    return yaml.load(Buffer.from(rawFile, 'base64').toString());
+}
 
 function upload(keyToOutputPathsMap) {
     Object.keys(keyToOutputPathsMap).forEach(
@@ -58,7 +103,7 @@ function upload(keyToOutputPathsMap) {
                 uploader.on('progress', function() {
                     // future dev enhancement: add progress bar
                 });
-                uploader.on('end', () => console.log('uploaded', Key);
+                uploader.on('end', () => console.log('uploaded', Key));
             })
         }
     )
@@ -66,7 +111,7 @@ function upload(keyToOutputPathsMap) {
 
 
 function getRemotePath(sourcePath) {
-    return `${trimLeadingSlash(strimExtension(sourcePath))}.pdf`;
+    return `${trimSlashes(strimExtension(sourcePath))}.pdf`;
 }
 
 function strimExtension(path) {
@@ -91,8 +136,8 @@ async function compileFromConfig({nodes, pathsMap}) {
                     paths.map(
                         async path => {
                             const outputPath = await compileGit(
-                                `https://github.com/${trimLeadingSlash(repo)}`,
-                                trimLeadingSlash(path),
+                                `https://github.com/${trimSlashes(repo)}`,
+                                trimSlashes(path),
                             );
                             outputPathMaps[key][path] = outputPath;
                         }
@@ -106,7 +151,7 @@ async function compileFromConfig({nodes, pathsMap}) {
 
 
 
-function trimLeadingSlash(s) {
+function trimSlashes(s) {
     return s.replace(/^\/|\/$/g, '');
 }
 
