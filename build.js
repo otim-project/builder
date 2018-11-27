@@ -2,52 +2,63 @@ const LatexOnline = require('./lib/LatexOnline');
 let latexOnline;
 
 LatexOnline.create('/tmp/downloads/', '/tmp/storage/').then(
-    function (initializedLatexOnline) {
+    async function (initializedLatexOnline) {
         latexOnline = initializedLatexOnline;
-        console.log(
-
-            compileFromConfig({
-                nodes: [{
+        const outputs = await compileFromConfig({
+            nodes: [
+                {
                     key: 'toen-mastercourse',
                     repo: 'jakebian/OTIM-toen-mastercourse'
-                }],
-                pathsMap: {
-                    'toen-mastercourse': [
-                        "/chapters/lecture1.tex",
-                        "/chapters/lecture2-3.tex"
-                    ]
+                },
+                {
+                    key: 'non-existence',
+                    repo: 'jakebian/non-existence'
                 }
-            })
+            ],
+            pathsMap: {
+                'toen-mastercourse': [
+                    "/chapters/lecture1.tex",
+                    "/chapters/lecture2-3.tex"
+                ]
+            }
+        })
 
-        )
+        console.log(outputs)
     }
 )
 
-function compileFromConfig({nodes, pathsMap}) {
+async function compileFromConfig({nodes, pathsMap}) {
     const outputPathMaps = {};
-    nodes.forEach(
-        ({key, repo}) => {
-            const paths = pathsMap[key];
-            if (!outputPathMaps[key]) {
-                outputPathMaps[key] = {};
-            }
-            if (!paths) {
-                console.error(`Bad or missing metadata for node ${key} : ${repo}`)
-                return;
-            }
-            paths.forEach(
-                path => {
-                    const outputPath = compileGit(
-                        `https://github.com/${trimLeadingSlash(repo)}`,
-                        trimLeadingSlash(path),
-                    );
-                    outputPathMaps[key][path] = outputPath;
+
+    await Promise.all(
+        nodes.map(
+            async ({key, repo}) => {
+                const paths = pathsMap[key];
+                if (!outputPathMaps[key]) {
+                    outputPathMaps[key] = {};
                 }
-            )
-        }
+                if (!paths) {
+                    console.error(`Bad or missing metadata for node ${key} : ${repo}`)
+                    return;
+                }
+                return Promise.all(
+                    paths.map(
+                        async path => {
+                            const outputPath = await compileGit(
+                                `https://github.com/${trimLeadingSlash(repo)}`,
+                                trimLeadingSlash(path),
+                            );
+                            outputPathMaps[key][path] = outputPath;
+                        }
+                    )
+                )
+            }
+        )
     )
     return outputPathMaps;
 }
+
+
 
 function trimLeadingSlash(s) {
     return s.replace(/^\/|\/$/g, '');
