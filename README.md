@@ -1,4 +1,4 @@
-#OTIM builder
+# OTIM builder
 
 Compiles all repositories configured for OTIM. This is a fork of [aslushnikov/latex-online](https://github.com/aslushnikov/latex-online), adding new build scripts.
 
