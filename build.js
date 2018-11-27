@@ -1,4 +1,15 @@
 const LatexOnline = require('./lib/LatexOnline');
+const s3 = require('s3');
+const { accessKeyId, secretAccessKey, region } = require('./s3cred');
+
+const client = s3.createClient({
+  s3Options: {
+    accessKeyId,
+    secretAccessKey,
+    region,
+  },
+});
+
 let latexOnline;
 
 LatexOnline.create('/tmp/downloads/', '/tmp/storage/').then(
@@ -26,6 +37,11 @@ LatexOnline.create('/tmp/downloads/', '/tmp/storage/').then(
         console.log(outputs)
     }
 )
+
+
+function upload(keyToOutputPathsMap) {
+
+}
 
 async function compileFromConfig({nodes, pathsMap}) {
     const outputPathMaps = {};
