@@ -1,8 +1,8 @@
 const LatexOnline = require('./lib/LatexOnline');
 const s3 = require('s3');
-const { accessKeyId, secretAccessKey, region } = require('./s3cred');
+const { accessKeyId, secretAccessKey, region, Bucket } = require('./s3creds');
 
-const client = s3.createClient({
+const s3Client = s3.createClient({
   s3Options: {
     accessKeyId,
     secretAccessKey,
@@ -28,19 +28,49 @@ LatexOnline.create('/tmp/downloads/', '/tmp/storage/').then(
             ],
             pathsMap: {
                 'toen-mastercourse': [
-                    "/chapters/lecture1.tex",
-                    "/chapters/lecture2-3.tex"
+                    '/chapters/lecture1.tex',
+                    '/chapters/lecture2-3.tex'
                 ]
             }
         })
 
         console.log(outputs)
+
+        upload(outputs)
     }
 )
 
 
 function upload(keyToOutputPathsMap) {
+    Object.keys(keyToOutputPathsMap).forEach(
+        nodeKey => {
+            const pathsMap = keyToOutputPathsMap[nodeKey];
+            Object.keys(pathsMap).forEach(sourcePath => {
+                const Key = `${nodeKey}/${getRemotePath(sourcePath)}`;
+                const uploader = s3Client.uploadFile({
+                    localFile: pathsMap[sourcePath],
+                    s3Params: { Bucket, Key },
+                });
 
+                uploader.on('error', function(err) {
+                  console.error(`unable to upload ${Key}`, err.stack);
+                });
+                uploader.on('progress', function() {
+                    // future dev enhancement: add progress bar
+                });
+                uploader.on('end', () => console.log('uploaded', Key);
+            })
+        }
+    )
+}
+
+
+function getRemotePath(sourcePath) {
+    return `${trimLeadingSlash(strimExtension(sourcePath))}.pdf`;
+}
+
+function strimExtension(path) {
+    return path.split('.').slice(0, -1).join('.')
 }
 
 async function compileFromConfig({nodes, pathsMap}) {
