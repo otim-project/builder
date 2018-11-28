@@ -21,8 +21,8 @@ LatexOnline.create('/tmp/downloads/', '/tmp/storage/').then(
 
         const config = await getConfig();
         const outputs = await compileFromConfig(config)
-        uploadResult(outputs)
-        console.log('completed');
+        const uploadTask = await uploadResult(outputs)
+        console.log('uploaded everthing!')
     }
 )
 
@@ -85,26 +85,39 @@ function parseYamlConfig(rawFile) {
 }
 
 function uploadResult(keyToOutputPathsMap) {
-    Object.keys(keyToOutputPathsMap).forEach(
-        nodeKey => {
-            const pathsMap = keyToOutputPathsMap[nodeKey];
-            Object.keys(pathsMap).forEach(sourcePath => {
-                const Key = `${nodeKey}/${getRemotePath(sourcePath)}`;
-                const uploader = s3Client.uploadFile({
-                    localFile: pathsMap[sourcePath],
-                    s3Params: { Bucket, Key },
-                });
+    return Promise.all(
+        Object.keys(keyToOutputPathsMap).reduce(
+            (result, nodeKey) => {
+                const pathsMap = keyToOutputPathsMap[nodeKey];
+                return [
+                    ...result,
+                    ...Object.keys(pathsMap).map(sourcePath => {
 
-                uploader.on('error', function(err) {
-                  console.error(`unable to upload ${Key}`, err.stack);
-                });
-                uploader.on('progress', function() {
-                    // future dev enhancement: add progress bar
-                });
-                uploader.on('end', () => console.log('uploaded', Key));
-            })
-        }
-    )
+                        return new Promise((resolve, reject) => {
+                            const Key = `${nodeKey}/${getRemotePath(sourcePath)}`;
+                            const uploader = s3Client.uploadFile({
+                                localFile: pathsMap[sourcePath],
+                                s3Params: { Bucket, Key },
+                            });
+
+                            uploader.on('error', (err) => {
+                              console.error(`unable to upload ${Key}`, err.stack);
+                              reject(err);
+                            });
+                            uploader.on('progress', function() {
+                                // future dev enhancement: add progress bar
+                            });
+                            uploader.on('end', () => {
+                                console.log('uploaded', Key)
+                                resolve(Key);
+                            });
+                        })
+                    })
+                ]
+            },
+            []
+        )
+    );
 }
 
 
