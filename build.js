@@ -39,14 +39,15 @@ async function getConfig() {
 }
 
 async function getPathsMap(nodesConfig) {
-    return nodesConfig.reduce(async (result, {key, repo: nodeRepo }) => {
+    return nodesConfig.reduce(async (resultPromise, {key, repo: nodeRepo }) => {
+        const result = await resultPromise;
         const [ owner, repo ] = trimSlashes(nodeRepo).split('/');
         const nodeContent = await getNodeContent(owner, repo);
         return {
             ...result,
             [key]: getAllPaths(nodeContent)
         };
-    }, {});
+    }, Promise.resolve({}));
 }
 
 function getAllPaths(nodes) {
