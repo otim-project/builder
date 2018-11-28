@@ -3,6 +3,7 @@ const s3 = require('s3');
 const { accessKeyId, secretAccessKey, region, Bucket } = require('./s3creds');
 const octokit = require('@octokit/rest')()
 const yaml = require('js-yaml');
+const request = require('request');
 
 const s3Client = s3.createClient({
   s3Options: {
@@ -22,7 +23,9 @@ LatexOnline.create('/tmp/downloads/', '/tmp/storage/').then(
         const config = await getConfig();
         const outputs = await compileFromConfig(config)
         const uploadTask = await uploadResult(outputs)
-        console.log('uploaded everthing!')
+        console.log('uploaded everthing, triggering site build')
+        const triggerSiteBuild = await request.post(process.env.SITE_BUILD_TRIGGER);
+        console.log('triggered site build')
     }
 )
 
